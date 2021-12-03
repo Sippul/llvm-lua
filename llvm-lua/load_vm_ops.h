@@ -25,7 +25,7 @@
 #ifndef load_vm_ops_h
 #define load_vm_ops_h
 
-extern llvm::Module *load_vm_ops(llvm::LLVMContext &context, bool NoLazyCompilation);
+extern std::unique_ptr<llvm::Module> load_vm_ops(llvm::LLVMContext &context, bool NoLazyCompilation);
 
 #endif
 

@@ -49,7 +49,7 @@ LLVMCompiler *llvm_get_compiler(lua_State *L) {
 void llvm_new_compiler(lua_State *L) {
 	global_State *g = G(L);
 	if(g_need_init) {
-		LLVMLinkInJIT();
+        LLVMLinkInMCJIT();
 		LLVMInitializeNativeTarget();
 		g_need_init = 0;
 	}

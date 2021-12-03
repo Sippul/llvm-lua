@@ -32,7 +32,7 @@
 
 #include "lua_vm_ops_bc.h"
 
-llvm::Module *load_vm_ops(llvm::LLVMContext &context, bool NoLazyCompilation) {
+std::unique_ptr<llvm::Module> load_vm_ops(llvm::LLVMContext &context, bool NoLazyCompilation) {
 	return load_embedded_bc(context, "lua_vm_ops_bc", lua_vm_ops_bc,
 		sizeof(lua_vm_ops_bc), NoLazyCompilation);
 }

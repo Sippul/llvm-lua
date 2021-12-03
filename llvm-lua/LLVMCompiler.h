@@ -91,7 +91,7 @@ private:
 
 private:
 	llvm::LLVMContext Context;
-	llvm::Module *M;
+	std::unique_ptr<llvm::Module> M;
 	llvm::FunctionPassManager *TheFPM;
 	llvm::ExecutionEngine *TheExecutionEngine;
 	bool strip_code;
@@ -154,8 +154,8 @@ public:
 	/*
 	 * return the module.
 	 */
-	llvm::Module *getModule() {
-		return M;
+	std::unique_ptr<llvm::Module> *getModule() {
+		return &M;
 	}
 
 	llvm::LLVMContext& getCtx() {

@@ -32,7 +32,7 @@
 
 #include "liblua_main_bc.h"
 
-llvm::Module *load_liblua_main(llvm::LLVMContext &context, bool NoLazyCompilation) {
+std::unique_ptr<llvm::Module> load_liblua_main(llvm::LLVMContext &context, bool NoLazyCompilation) {
 	return load_embedded_bc(context, "liblua_main_bc", liblua_main_bc,
 		sizeof(liblua_main_bc), NoLazyCompilation);
 }

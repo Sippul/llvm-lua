@@ -36,10 +36,10 @@
 
 #include "load_embedded_bc.h"
 
-llvm::Module *load_embedded_bc(llvm::LLVMContext &context,
+std::unique_ptr<llvm::Module> load_embedded_bc(llvm::LLVMContext &context,
 	const char *name, const unsigned char *start, size_t len, bool NoLazyCompilation)
 {
-	llvm::Module *module = NULL;
+	std::unique_ptr<llvm::Module> module = NULL;
 	llvm::StringRef mem_ref((const char *)start, len - 1);
 	std::string error;
 
@@ -49,7 +49,8 @@ llvm::Module *load_embedded_bc(llvm::LLVMContext &context,
 	std::unique_ptr<llvm::MemoryBuffer> buffer;
 	buffer= llvm::MemoryBuffer::getMemBuffer(mem_ref, name);
 	if(buffer != NULL) {
-		module = llvm::getLazyBitcodeModule(buffer->getMemBufferRef(), context)->release();
+        module = std::move(llvm::getLazyBitcodeModule(buffer->getMemBufferRef(), context).get());
+//		module = *llvm::getLazyBitcodeModule(buffer->getMemBufferRef(), context);
 		if(!module) {
 			// delete buffer;
 		}

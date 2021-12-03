@@ -233,14 +233,14 @@ LLVMCompiler::LLVMCompiler(int useJIT) {
 	M = load_vm_ops(getCtx(), NoLazyCompilation);
 
 	// get important struct types.
-	Ty_TValue = M->getTypeByName("struct.lua_TValue");
+    Ty_TValue = llvm::StructType::getTypeByName(M->getContext(), "struct.lua_TValue");
 	if(Ty_TValue == NULL) {
-		Ty_TValue = M->getTypeByName("struct.TValue");
+        Ty_TValue = llvm::StructType::getTypeByName(M->getContext(), "struct.TValue");
 	}
 	Ty_TValue_ptr = llvm::PointerType::getUnqual(Ty_TValue);
-	Ty_LClosure = M->getTypeByName("struct.LClosure");
-	Ty_LClosure_ptr = llvm::PointerType::getUnqual(Ty_LClosure);
-	Ty_lua_State = M->getTypeByName("struct.lua_State");
+    Ty_LClosure = llvm::StructType::getTypeByName(M->getContext(), "struct.LClosure");
+    Ty_LClosure_ptr = llvm::PointerType::getUnqual(Ty_LClosure);
+    Ty_lua_State = llvm::StructType::getTypeByName(M->getContext(), "struct.lua_State");
 	Ty_lua_State_ptr = llvm::PointerType::getUnqual(Ty_lua_State);
 	// setup argument lists.
 	func_args.clear();
