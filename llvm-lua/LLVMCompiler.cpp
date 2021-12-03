@@ -190,8 +190,8 @@ llvm::Value *LLVMCompiler::get_proto_constant(TValue *constant) {
 
 LLVMCompiler::LLVMCompiler(int useJIT) {
 	std::string error;
-	llvm::Timer load_ops("load_ops");
-	llvm::Timer load_jit("load_jit");
+	llvm::Timer load_ops("load_ops", "Load OPs");
+	llvm::Timer load_jit("load_jit", "Load JIT");
 	llvm::FunctionType *func_type;
 	llvm::Function *func;
 	std::vector<llvm::Type*> func_args;
@@ -204,8 +204,8 @@ LLVMCompiler::LLVMCompiler(int useJIT) {
 	if(OptLevelO3) OptLevel = 3;
 	if(DisableOpt) OptLevel = 0;
 	// create timers.
-	lua_to_llvm = new llvm::Timer("lua_to_llvm");
-	codegen = new llvm::Timer("codegen");
+	lua_to_llvm = new llvm::Timer("lua_to_llvm", "Lua to LLVM");
+	codegen = new llvm::Timer("codegen", "Codegen");
 	strip_code = false;
 
 	// initialize opcode data arrays.

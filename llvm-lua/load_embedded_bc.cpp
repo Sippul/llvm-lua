@@ -25,11 +25,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "llvm/Module.h"
-#include "llvm/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/LLVMContext.h"
 
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Bitcode/ReaderWriter.h"
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 
 #include <string>
 
@@ -45,12 +46,12 @@ llvm::Module *load_embedded_bc(llvm::LLVMContext &context,
 	// Load in the bitcode file containing the functions for each
 	// bytecode operation.
 
-	llvm::MemoryBuffer* buffer;
+	std::unique_ptr<llvm::MemoryBuffer> buffer;
 	buffer= llvm::MemoryBuffer::getMemBuffer(mem_ref, name);
 	if(buffer != NULL) {
-		module = llvm::getLazyBitcodeModule(buffer, context, &error);
+		module = llvm::getLazyBitcodeModule(buffer->getMemBufferRef(), context)->release();
 		if(!module) {
-			delete buffer;
+			// delete buffer;
 		}
 	}
 	if(!module) {
@@ -59,7 +60,7 @@ llvm::Module *load_embedded_bc(llvm::LLVMContext &context,
 	}
 	// Materialize module
 	if(NoLazyCompilation) {
-		if(module->MaterializeAll(&error)) {
+		if(module->materializeAll()) {
 			printf("Failed to materialize embedded '%s' file: %s\n", name, error.c_str());
 			exit(1);
 		}
