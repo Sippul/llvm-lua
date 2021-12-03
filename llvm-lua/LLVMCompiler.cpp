@@ -22,19 +22,19 @@
   MIT License: http://www.opensource.org/licenses/mit-license.php
 */
 
-#include "llvm/LLVMContext.h"
-#include "llvm/DerivedTypes.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/Module.h"
-#include "llvm/PassManager.h"
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/Target/TargetData.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h" 
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Support/IRBuilder.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/CommandLine.h"
 #include <cstdio>
