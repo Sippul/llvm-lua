@@ -302,6 +302,8 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_WITHDEBINFO} -O2 -g")
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+
 #
 # For uninstall (needs cmake_uninstall.cmake.in in the top-level directory)
 #
