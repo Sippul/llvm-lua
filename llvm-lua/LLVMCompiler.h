@@ -44,9 +44,11 @@ extern "C" {
 #endif
 
 namespace llvm {
-class FunctionPassManager;
 class ExecutionEngine;
 class Timer;
+  namespace legacy {
+    class FunctionPassManager;
+  }
 }
 
 class LLVMCompiler {
@@ -91,8 +93,9 @@ private:
 
 private:
 	llvm::LLVMContext Context;
-	std::unique_ptr<llvm::Module> M;
-	llvm::FunctionPassManager *TheFPM;
+	std::unique_ptr<llvm::Module> Module; // insane dirty temporary hack
+  llvm::Module* ModuleRaw; // insane dirty temporary hack
+	llvm::legacy::FunctionPassManager *TheFPM;
 	llvm::ExecutionEngine *TheExecutionEngine;
 	bool strip_code;
 
@@ -154,8 +157,8 @@ public:
 	/*
 	 * return the module.
 	 */
-	std::unique_ptr<llvm::Module> *getModule() {
-		return &M;
+	llvm::Module* getModule() {
+		return ModuleRaw;
 	}
 
 	llvm::LLVMContext& getCtx() {

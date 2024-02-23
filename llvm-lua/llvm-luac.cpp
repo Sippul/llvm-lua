@@ -24,28 +24,21 @@
 
 #include <stdio.h>
 
-#include "llvm/LLVMContext.h"
-#include "llvm/Module.h"
-#include "llvm/PassManager.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"
-#include "llvm/ADT/Triple.h"
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/CodeGen/LinkAllAsmWriterComponents.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
-#include "llvm/Config/config.h"
-#include "llvm/LinkAllVMCore.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/PluginLoader.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/TargetRegistry.h"
-#include "llvm/Target/TargetData.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
 
 #include "llvm_compiler.h"
@@ -90,19 +83,20 @@ namespace {
 
 }
 
-void print_version() {
+void print_version(llvm::raw_ostream &os) {
 	printf(LLVM_LUA_VERSION " " LLVM_LUA_COPYRIGHT "\n");
 	printf(LUA_RELEASE "  " LUA_COPYRIGHT "\n");
 	llvm::cl::PrintVersionMessage();
 	printf("\n");
-	llvm::TargetRegistry::printRegisteredTargetsForVersion();
+	llvm::TargetRegistry::printRegisteredTargetsForVersion(os);
 }
 
 /*
  *
  */
-int main(int argc, char ** argv) {
-  llvm::sys::PrintStackTraceOnErrorSignal();
+int main(int argc, char ** argv)
+{
+  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
   llvm::PrettyStackTraceProgram X(argc, argv);
 	std::vector<std::string> arg_list;
 	llvm::llvm_shutdown_obj Y;   // Call llvm_shutdown() on exit.
@@ -113,7 +107,7 @@ int main(int argc, char ** argv) {
 	int pos;
 	int ret;
 
-  // Initialize targets first.
+  // Initialize targets first.x
   llvm::InitializeAllTargets();
   llvm::InitializeAllTargetMCs();
   llvm::InitializeAllAsmPrinters();
@@ -123,8 +117,9 @@ int main(int argc, char ** argv) {
 
 	llvm::cl::ParseCommandLineOptions(argc, argv, "LLVM-Lua native compiler\n");
 	// Show version?
-	if(ShowVersion) {
-		print_version();
+	if (ShowVersion)
+  {
+		print_version(llvm::outs());
 		return 0;
 	}
 	// recreate arg list.

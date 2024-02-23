@@ -101,6 +101,7 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/liblua_main_bc.h
 set(LLVM_LUA_LIBS)
 
 if(WANT_STATIC_LIBRARY)
+	message("Use static linkage")
 	# llvm-lua static library.
 	add_library(llvm-lua_static STATIC ${LLVM_LUA_LIB_SRC})
 	add_target_properties(llvm-lua_static COMPILE_FLAGS "${COMMON_CFLAGS} ${LLVM_CFLAGS}")
@@ -123,6 +124,7 @@ if(WANT_STATIC_LIBRARY)
 endif(WANT_STATIC_LIBRARY)
 
 if(WANT_SHARED_LIBRARY)
+	message("Use dynamic linkage")
 	# llvm-lua dynamic library
 	add_library(llvm-lua_dynamic SHARED ${LLVM_LUA_LIB_SRC})
 	add_target_properties(llvm-lua_dynamic COMPILE_FLAGS "${COMMON_CFLAGS} ${LLVM_CFLAGS}")
@@ -201,7 +203,9 @@ if(APPLE)
 		)
 	else(INSTALL_NAME_DIR)
 		# no install_name folder force BUILD_WITH_INSTALL_RPATH to OFF
-		set_property(TARGET llvm-lua_dynamic PROPERTY BUILD_WITH_INSTALL_RPATH OFF)
+		if(WANT_SHARED_LIBRARY)
+			set_property(TARGET llvm-lua_dynamic PROPERTY BUILD_WITH_INSTALL_RPATH OFF)
+		endif()
 	endif(INSTALL_NAME_DIR)
 
 	set(CMAKE_OSX_ARCHITECTURES ${OSX_ARCHITECTURES})

@@ -25,7 +25,7 @@
 #ifndef load_liblua_main_h
 #define load_liblua_main_h
 
-extern llvm::Module *load_liblua_main(llvm::LLVMContext &context, bool NoLazyCompilation);
+extern std::unique_ptr<llvm::Module> load_liblua_main(llvm::LLVMContext &context, bool NoLazyCompilation);
 
 #endif
 

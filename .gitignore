@@ -1,4 +1,6 @@
+cmake-build-debug
 build
+.idea
 llvm-lua/*.bc
 llvm-lua/*_bc.h
 src/.libs

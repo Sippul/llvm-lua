@@ -1,7 +1,10 @@
 #
 # llvm-lua
 #
-cmake_minimum_required(VERSION 2.4 FATAL_ERROR)
+
+cmake_minimum_required(VERSION 3.26)
+set(CMAKE_CXX_STANDARD 20)
+
 
 if(COMMAND cmake_policy)
   cmake_policy(SET CMP0003 NEW)
@@ -83,11 +86,13 @@ elseif(APPLE)
 	set(DEFAULT_DLOPEN ON)
 	# use this on Mac OS X 10.3-
 	option(LUA_USE_MACOSX "Mac OS X 10.3-" OFF)
-	set(OSX_ARCHITECTURES "x86_64" CACHE STRING "Build architectures for OSX")
-	CMAKE_DEPENDENT_OPTION(WANT_FRAMEWORK
-		"Set to ON to build framework instead of dylib." ON
-		"WANT_SHARED_LIBRARY" ON
-	)
+	#set(OSX_ARCHITECTURES "x86_64" CACHE STRING "Build architectures for OSX")
+	set(WANT_FRAMEWORK OFF)
+	set(WANT_SHARED_LIBRARY OFF)
+#	CMAKE_DEPENDENT_OPTION(WANT_FRAMEWORK
+#		"Set to ON to build framework instead of dylib." ON
+#		"WANT_SHARED_LIBRARY" ON
+#	)
 	CMAKE_DEPENDENT_OPTION(LUA_FRAMEWORK_SYMLINKS
 		"Set to ON to create symlinks to llvm-lua & llvm-luac to CMAKE_PREFIX_PATH/bin." ON
 		"WANT_FRAMEWORK;WANT_SHARED_LIBRARY" ON
@@ -108,6 +113,8 @@ elseif(APPLE)
 
 	set(LUA_SOVERSION
 				"${LUA_VERSION_MAJOR}.${LUA_VERSION_MINOR}.0")
+
+	set(COMMON_CFLAGS "${COMMON_CFLAGS} -D_XOPEN_SOURCE=600")
 elseif(CYGWIN)
 	set(DEFAULT_POSIX TRUE)
 	set(USE_RPATH TRUE)

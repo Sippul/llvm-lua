@@ -25,7 +25,7 @@
 #ifndef LLVMDUMPER_h
 #define LLVMDUMPER_h
 
-#include "llvm/Module.h"
+#include "llvm/IR/Module.h"
 #include "lua_core.h"
 
 #ifdef __cplusplus
@@ -52,7 +52,7 @@ class LLVMCompiler;
 class LLVMDumper {
 private:
 	LLVMCompiler *compiler;
-	llvm::Module *M;
+	llvm::Module *Module;
 
 	// types.
 	llvm::Type *Ty_str_ptr;

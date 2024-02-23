@@ -29,6 +29,7 @@
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/TargetSelect.h"
 
 namespace {
   llvm::cl::opt<std::string>
@@ -66,7 +67,7 @@ namespace {
 
 }
 
-void print_version() {
+void print_version(llvm::raw_ostream &os) {
 	printf(LLVM_LUA_VERSION " " LLVM_LUA_COPYRIGHT "\n");
 	printf(LUA_RELEASE "  " LUA_COPYRIGHT "\n");
 	llvm::cl::PrintVersionMessage();
@@ -96,11 +97,16 @@ int main(int argc, char ** argv) {
 		}
 	}
 
+  llvm::InitializeAllTargets();
+  llvm::InitializeAllTargetMCs();
+  llvm::InitializeAllAsmPrinters();
+  llvm::InitializeAllAsmParsers();
+
 	llvm::cl::SetVersionPrinter(print_version);
-	llvm::cl::ParseCommandLineOptions(new_argc, argv, 0, true);
+	llvm::cl::ParseCommandLineOptions(new_argc, argv);
 	// Show version?
 	if(ShowVersion) {
-		print_version();
+		print_version(llvm::outs());
 		return 0;
 	}
 	// recreate arg list.
