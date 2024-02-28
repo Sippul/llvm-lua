@@ -25,9 +25,12 @@
 #ifndef LLVMCOMPILER_h
 #define LLVMCOMPILER_h
 
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/LLVMContext.h"
+
+#include "VMModule.h"
 
 #include "lua_core.h"
 
@@ -53,78 +56,45 @@ class Timer;
 
 class LLVMCompiler {
 private:
-	class OPFunc {
-	public:
-		const vm_func_info *info;
-		bool compiled;
-		llvm::Function *func;
-		OPFunc *next;
-
-		OPFunc(const vm_func_info *info_, OPFunc *next_) :
-				info(info_), compiled(false), func(NULL), next(next_) {}
-		~OPFunc() {
-			if(next) delete next;
-		}
-	};
 	class OPValues {
 	private:
-		int len;
-		llvm::Value **values;
+		std::vector<llvm::Value*> values;
 	
 	public:
-		OPValues(int len_) : len(len_), values(new llvm::Value *[len_]) {
-			for(int i = 0; i < len; ++i) {
-				values[i] = NULL;
-			}
+		explicit OPValues(int len)
+		{
+			values.resize(len, nullptr);
 		}
 	
-		~OPValues() {
-			delete[] values;
-		}
 		void set(int idx, llvm::Value *val) {
-			assert(idx >= 0 && idx < len);
+			assert(idx >= 0 && idx < values.size());
 			values[idx] = val;
 		}
 		llvm::Value *get(int idx) {
-			assert(idx >= 0 && idx < len);
+			assert(idx >= 0 && idx < values.size());
 			return values[idx];
 		}
 	};
 
+	struct BuildContext
+	{
+		Instruction* code = nullptr;
+		TValue* k = nullptr;
+		int code_len;
+		int strip_ops = 0;
+
+		llvm::Value* func_L = nullptr;
+		llvm::CallInst* func_cl = nullptr;
+		llvm::CallInst* func_k = nullptr;
+	};
+
 private:
-	llvm::LLVMContext Context;
-	std::unique_ptr<llvm::Module> Module; // insane dirty temporary hack
-  llvm::Module* ModuleRaw; // insane dirty temporary hack
-	llvm::legacy::FunctionPassManager *TheFPM;
-	llvm::ExecutionEngine *TheExecutionEngine;
+  VMModule vm_module;
+  llvm::orc::ThreadSafeContext ts_context;
+	std::unique_ptr<llvm::orc::LLJIT> jit;
+
 	bool strip_code;
 
-	// struct types.
-	llvm::Type *Ty_TValue;
-	llvm::Type *Ty_TValue_ptr;
-	llvm::Type *Ty_LClosure;
-	llvm::Type *Ty_LClosure_ptr;
-	llvm::Type *Ty_lua_State;
-	llvm::Type *Ty_lua_State_ptr;
-	// common function types.
-	llvm::FunctionType *lua_func_type;
-	// functions to get LClosure & constants pointer.
-	llvm::Function *vm_get_current_closure;
-	llvm::Function *vm_get_current_constants;
-	llvm::Function *vm_get_number;
-	llvm::Function *vm_get_long;
-	llvm::Function *vm_set_number;
-	llvm::Function *vm_set_long;
-	// function for counting each executed op.
-	llvm::Function *vm_count_OP;
-	// function for print each executed op.
-	llvm::Function *vm_print_OP;
-	// function for handling count/line debug hooks.
-	llvm::Function *vm_next_OP;
-	// function for handling a block of simple opcodes.
-	llvm::Function *vm_mini_vm;
-	// available op function for each opcode.
-	OPFunc **vm_op_funcs;
 	// count compiled opcodes.
 	int *opcode_stats;
 
@@ -133,18 +103,24 @@ private:
 	llvm::Timer *codegen;
 
 	// opcode hints/values/blocks/need_block arrays used in compile() method.
-	int opcode_data_len; // length of opcode arrays.
-	hint_t *op_hints;
-	OPValues **op_values;
-	llvm::BasicBlock **op_blocks;
-	bool *need_op_block;
-	// resize the opcode hint data arrays.
-	void resize_opcode_data(int code_len);
-	// reset/clear the opcode hint data arrays.
-	void clear_opcode_data(int code_len);
+	std::vector<hint_t> op_hints;
+	std::vector<std::unique_ptr<OPValues>> op_values;
+	std::vector<llvm::BasicBlock*> op_blocks;
+	std::vector<bool> need_op_block;
 
+	std::unordered_map<Proto*, llvm::orc::ResourceTrackerSP> trackers;
+
+	// resize the opcode hint data arrays.
+	void ResizeOpcodeData(int code_len);
+	// reset/clear the opcode hint data arrays.
+	void ClearOpcodeData(int code_len);
+
+	void FindBasicBlockPoints(llvm::LLVMContext& context, llvm::IRBuilder<>& builder, BuildContext& bcontext);
+	void PreCreateBasicBlocks(llvm::LLVMContext& context, llvm::Function* func, BuildContext& bcontext);
+	std::vector<llvm::Value*> GetOpCallArgs(llvm::LLVMContext& context, const vm_func_info* func_info, BuildContext& bcontext, int i);
+	void InsertDebugCalls(llvm::LLVMContext& context, llvm::IRBuilder<>& builder, BuildContext& bcontext, int i);
 public:
-	LLVMCompiler(int useJIT);
+	explicit LLVMCompiler(int useJIT);
 	~LLVMCompiler();
 
 	/*
@@ -157,21 +133,23 @@ public:
 	/*
 	 * return the module.
 	 */
-	llvm::Module* getModule() {
-		return ModuleRaw;
-	}
-
-	llvm::LLVMContext& getCtx() {
-		return Context;
-	}
-
-	llvm::FunctionType *get_lua_func_type() {
-		return lua_func_type;
-	}
+//	llvm::Module* getModule() {
+//		return ModuleRaw;
+//	}
+//
+//	llvm::LLVMContext& getCtx() {
+//		return Context;
+//	}
+//
+//	llvm::FunctionType *get_lua_func_type() {
+//		return lua_func_type;
+//	}
 
 	llvm::Type *get_var_type(val_t type, hint_t hints);
 
 	llvm::Value *get_proto_constant(TValue *constant);
+
+  std::string GenerateFunctionName(Proto *p);
 	
 	/*
 	 * Pre-Compile all loaded functions.

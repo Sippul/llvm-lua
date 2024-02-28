@@ -9,6 +9,7 @@ set(NON_LLVM_SRC
 )
 set(LLVM_COMMON_SRC
 	LLVMCompiler.cpp
+	VMModule.cpp
 	llvm_compiler.cpp
 	load_embedded_bc.cpp
 	load_vm_ops.cpp

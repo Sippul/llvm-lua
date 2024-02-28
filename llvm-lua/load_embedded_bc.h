@@ -25,8 +25,8 @@
 #ifndef load_embedded_bc_h
 #define load_embedded_bc_h
 
-extern std::unique_ptr<llvm::Module> load_embedded_bc(llvm::LLVMContext &context,
-	const char *name, const unsigned char *start, size_t len, bool NoLazyCompilation);
+extern std::unique_ptr<llvm::Module> LoadEmbeddedBitcode(llvm::LLVMContext &context,
+	const char *name, const unsigned char *start, size_t len);
 
 #endif
 
