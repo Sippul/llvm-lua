@@ -3,6 +3,7 @@
 //
 
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
+#include <assert.h>
 
 #include "VMModule.h"
 #include "load_embedded_bc.h"
@@ -59,9 +60,9 @@ void VMModule::CollectVMFunctions(llvm::Module* module)
       "vm_get_current_closure",
       "vm_get_current_constants",
       "vm_get_number",
-      "vm_get_long"
+      "vm_get_long",
       "vm_set_number",
-      "vm_set_long"
+      "vm_set_long",
   };
 
   for (auto name : funcs_to_find)
@@ -94,7 +95,7 @@ void VMModule::CollectVMOpcodes(llvm::LLVMContext& context, llvm::Module* module
     auto op_function = std::make_unique<OPFunctionVariant>(func_info);
 
     llvm::Function* func = module->getFunction(func_info->name);
-    if (func != NULL)
+    if (func != nullptr)
     {
       op_function->func = func;
     }
@@ -158,9 +159,19 @@ llvm::Type* VMModule::GetVarType(llvm::LLVMContext& context, val_t type, hint_t 
   }
 }
 
-OPFunctionVariant* VMModule::op_func(int opcode, hint_t hint)
+OPFunctionVariant* VMModule::op_func(int opcode, hint_t hint_mask)
 {
-  return op_functions[opcode].variants[hint].get();
+  for (auto& [hint, variant] : op_functions[opcode].variants)
+  {
+    if ((hint & hint_mask) == hint)
+    {
+      return variant.get();
+    }
+  }
+
+  assert(false);
+
+  return nullptr;
 }
 
 

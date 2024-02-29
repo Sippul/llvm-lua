@@ -448,7 +448,6 @@ void LLVMCompiler::FindBasicBlockPoints(llvm::LLVMContext& context, llvm::IRBuil
 						} else {
 							vals->set(3, builder.CreateAlloca(llvm::Type::getDoubleTy(context), 0, "for_idx"));
 						}
-						op_values[branch] = std::move(vals);
 						// check if step, init, limit are constants
 						if(is_const_num[2]) {
 							// step is a constant
@@ -490,6 +489,7 @@ void LLVMCompiler::FindBasicBlockPoints(llvm::LLVMContext& context, llvm::IRBuil
 							}
 						}
 						// make sure OP_FORPREP doesn't subtract 'step' from 'init'
+						op_values[branch] = std::move(vals);
 						op_hints[i] |= HINT_NO_SUB;
 					}
 				}
