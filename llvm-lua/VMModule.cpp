@@ -20,10 +20,18 @@ llvm::orc::ThreadSafeModule VMModule::Load(llvm::orc::ThreadSafeContext ts_conte
   auto module = LoadEmbeddedBitcode(context, "lua_vm_ops_bc", lua_vm_ops_bc, sizeof(lua_vm_ops_bc));
 
   CollectVMTypes(context);
-  CollectVMFunctions(module.get());
-  CollectVMOpcodes(context, module.get());
 
   return {std::move(module), ts_context};
+}
+
+std::unique_ptr<VMModuleForwardDecl>  VMModule::PrepareForwardDeclarations(llvm::Module* module)
+{
+  auto decls = std::make_unique<VMModuleForwardDecl>();
+
+  decls->PrepareVMFunctions(*this, module);
+  decls->PrepareVMOpcodes(*this, module->getContext(), module);
+
+  return std::move(decls);
 }
 
 void VMModule::CollectVMTypes(llvm::LLVMContext& context)
@@ -49,40 +57,29 @@ void VMModule::CollectVMTypes(llvm::LLVMContext& context)
   t_lua_func = llvm::FunctionType::get(t_init32, {t_lua_State_ptr}, false);
 }
 
-void VMModule::CollectVMFunctions(llvm::Module* module)
+void VMModuleForwardDecl::PrepareVMFunctions(VMModule& vm, llvm::Module* module)
 {
-  FindOrCreateFunction(module, t_void, {t_lua_State_ptr, t_LClosure_ptr, t_init32}, "vm_next_OP");
-  FindOrCreateFunction(module, t_void, {t_lua_State_ptr, t_LClosure_ptr, t_init32, t_init32}, "vm_print_OP");
-  FindOrCreateFunction(module, t_void, {t_init32}, "vm_count_OP");
-  FindOrCreateFunction(module, t_void, {t_lua_State_ptr, t_LClosure_ptr, t_init32, t_init32}, "vm_mini_vm");
+  CreateFunctionDecl(module, vm.t_void, {vm.t_lua_State_ptr, vm.t_LClosure_ptr, vm.t_init32}, "vm_next_OP");
+  CreateFunctionDecl(module, vm.t_void, {vm.t_lua_State_ptr, vm.t_LClosure_ptr, vm.t_init32, vm.t_init32}, "vm_print_OP");
+  CreateFunctionDecl(module, vm.t_void, {vm.t_init32}, "vm_count_OP");
+  CreateFunctionDecl(module, vm.t_void, {vm.t_lua_State_ptr, vm.t_LClosure_ptr, vm.t_init32, vm.t_init32}, "vm_mini_vm");
 
-  auto funcs_to_find = {
-      "vm_get_current_closure",
-      "vm_get_current_constants",
-      "vm_get_number",
-      "vm_get_long",
-      "vm_set_number",
-      "vm_set_long",
-  };
-
-  for (auto name : funcs_to_find)
-  {
-    functions[name] = module->getFunction(name);
-  }
+  CreateFunctionDecl(module, vm.t_LClosure_ptr, {vm.t_lua_State_ptr}, "vm_get_current_closure");
+  CreateFunctionDecl(module, vm.t_TValue_ptr, {vm.t_LClosure_ptr}, "vm_get_current_constants");
+  CreateFunctionDecl(module, vm.t_double, {vm.t_lua_State_ptr, vm.t_init32 }, "vm_get_number");
+  CreateFunctionDecl(module, vm.t_int64, {vm.t_lua_State_ptr, vm.t_init32 }, "vm_get_long");
+  CreateFunctionDecl(module, vm.t_void, {vm.t_lua_State_ptr, vm.t_init32, vm.t_double}, "vm_set_number");
+  CreateFunctionDecl(module, vm.t_void, {vm.t_lua_State_ptr,vm.t_init32, vm.t_int64}, "vm_set_long");
 }
 
-void VMModule::FindOrCreateFunction(llvm::Module* module, llvm::Type *result, llvm::ArrayRef<llvm::Type*> params, const char* name)
+void VMModuleForwardDecl::CreateFunctionDecl(llvm::Module* module, llvm::Type *result, llvm::ArrayRef<llvm::Type*> params, const char* name)
 {
-  functions[name] = module->getFunction(name);
-  if (functions[name] == nullptr)
-  {
-    auto func_type = llvm::FunctionType::get(result, params, false);
-    functions[name] = llvm::Function::Create(func_type,
-                                        llvm::Function::ExternalLinkage, name, module);
-  }
+  auto func_type = llvm::FunctionType::get(result, params, false);
+  functions[name] = llvm::Function::Create(func_type,
+                                      llvm::Function::ExternalLinkage, name, module);
 }
 
-void VMModule::CollectVMOpcodes(llvm::LLVMContext& context, llvm::Module* module)
+void VMModuleForwardDecl::PrepareVMOpcodes(VMModule& vm, llvm::LLVMContext& context, llvm::Module* module)
 {
   for (int i = 0; true; ++i)
   {
@@ -94,35 +91,27 @@ void VMModule::CollectVMOpcodes(llvm::LLVMContext& context, llvm::Module* module
 
     auto op_function = std::make_unique<OPFunctionVariant>(func_info);
 
-    llvm::Function* func = module->getFunction(func_info->name);
-    if (func != nullptr)
-    {
-      op_function->func = func;
-    }
-    else
-    {
-      std::vector<llvm::Type*> func_args;
+    std::vector<llvm::Type*> func_args;
 
-      for(int x = 0; func_info->params[x] != VAR_T_VOID; x++) {
-        func_args.push_back(GetVarType(context, func_info->params[x], func_info->hint));
-      }
-
-      auto func_type = llvm::FunctionType::get(
-          GetVarType(context, func_info->ret_type, func_info->hint), func_args, false);
-      func = llvm::Function::Create(func_type, llvm::Function::ExternalLinkage,
-                                    func_info->name, module);
-      op_function->func = func;
+    for(int x = 0; func_info->params[x] != VAR_T_VOID; x++) {
+      func_args.push_back(GetVarType(vm, context, func_info->params[x], func_info->hint));
     }
+
+    auto func_type = llvm::FunctionType::get(
+        GetVarType(vm, context, func_info->ret_type, func_info->hint), func_args, false);
+    llvm::Function* func = llvm::Function::Create(func_type, llvm::Function::ExternalLinkage,
+                                  func_info->name, module);
+    op_function->func = func;
 
     op_functions[opcode].variants[func_info->hint] = std::move(op_function);
   }
 }
 
-llvm::Type* VMModule::GetVarType(llvm::LLVMContext& context, val_t type, hint_t hints)
+llvm::Type* VMModuleForwardDecl::GetVarType(VMModule& vm, llvm::LLVMContext& context, val_t type, hint_t hints)
 {
   switch(type) {
     case VAR_T_VOID:
-      return llvm::Type::getVoidTy(context);
+      return vm.t_void;
     case VAR_T_INT:
     case VAR_T_ARG_A:
     case VAR_T_ARG_B:
@@ -139,18 +128,18 @@ llvm::Type* VMModule::GetVarType(llvm::LLVMContext& context, val_t type, hint_t 
     case VAR_T_PC_OFFSET:
     case VAR_T_INSTRUCTION:
     case VAR_T_NEXT_INSTRUCTION:
-      return llvm::Type::getInt32Ty(context);
+      return vm.t_init32;
     case VAR_T_LUA_STATE_PTR:
-      return t_lua_State_ptr;
+      return vm.t_lua_State_ptr;
     case VAR_T_K:
-      return t_TValue_ptr;
+      return vm.t_TValue_ptr;
     case VAR_T_CL:
-      return t_LClosure_ptr;
+      return vm.t_LClosure_ptr;
     case VAR_T_OP_VALUE_0:
     case VAR_T_OP_VALUE_1:
     case VAR_T_OP_VALUE_2:
       if(hints & HINT_USE_LONG) {
-        return llvm::Type::getInt64Ty(context);
+        return vm.t_int64;
       }
       return llvm::Type::getDoubleTy(context);
     default:
@@ -159,7 +148,7 @@ llvm::Type* VMModule::GetVarType(llvm::LLVMContext& context, val_t type, hint_t 
   }
 }
 
-OPFunctionVariant* VMModule::op_func(int opcode, hint_t hint_mask)
+OPFunctionVariant* VMModuleForwardDecl::op_func(int opcode, hint_t hint_mask)
 {
   for (auto& [hint, variant] : op_functions[opcode].variants)
   {
@@ -173,7 +162,6 @@ OPFunctionVariant* VMModule::op_func(int opcode, hint_t hint_mask)
 
   return nullptr;
 }
-
 
 
 //llvm::Function* VMModule::CreateFunction()

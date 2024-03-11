@@ -205,7 +205,8 @@ LLVMCompiler::LLVMCompiler(int useJIT) :
 	if (useJIT)
 	{
 		jit = ExitOnErr(llvm::orc::LLJITBuilder().create());
-		ExitOnErr(jit->addIRModule(std::move(ts_vm_module)));
+		vm_module_tracker = jit->getMainJITDylib().createResourceTracker();
+		ExitOnErr(jit->addIRModule(vm_module_tracker, std::move(ts_vm_module)));
 	}
 
 	if (llvm::TimePassesIsEnabled) load_jit.stopTimer();
@@ -641,7 +642,7 @@ std::vector<llvm::Value*> LLVMCompiler::GetOpCallArgs(llvm::LLVMContext& context
 	return args;
 }
 
-void LLVMCompiler::InsertDebugCalls(llvm::LLVMContext& context, llvm::IRBuilder<>& builder, BuildContext& bcontext, int i)
+void LLVMCompiler::InsertDebugCalls(VMModuleForwardDecl* decl, llvm::LLVMContext& context, llvm::IRBuilder<>& builder, BuildContext& bcontext, int i)
 {
 	//fprintf(stderr, "%d: '%s' (%d) = 0x%08X, hint=0x%X\n", i, luaP_opnames[opcode], opcode, op_intr, op_hints[i]);
 	//fprintf(stderr, "%d: func: '%s', func hints=0x%X\n", i, opfunc->info->name,opfunc->info->hint);
@@ -649,26 +650,28 @@ void LLVMCompiler::InsertDebugCalls(llvm::LLVMContext& context, llvm::IRBuilder<
 	Instruction op_intr = bcontext.code[i];
 
 	if(PrintRunOpCodes) {
-		builder.CreateCall(vm_module.func("vm_print_OP"), {bcontext.func_L, bcontext.func_cl,
+		builder.CreateCall(decl->func("vm_print_OP"), {bcontext.func_L, bcontext.func_cl,
 																											 llvm::ConstantInt::get(context, llvm::APInt(32, op_intr)),
 																											 llvm::ConstantInt::get(context, llvm::APInt(32, i))});
 	}
 
 	if(RunOpCodeStats)
 	{
-		builder.CreateCall(vm_module.func("vm_count_OP"), llvm::ConstantInt::get(context, llvm::APInt(32, op_intr)));
+		builder.CreateCall(decl->func("vm_count_OP"), llvm::ConstantInt::get(context, llvm::APInt(32, op_intr)));
 	}
 
 	if(DebugOpCodes)
 	{
 		/* vm_next_OP function is used to call count/line debug hooks. */
-		builder.CreateCall(vm_module.func("vm_next_OP"), {bcontext.func_L, bcontext.func_cl, llvm::ConstantInt::get(context, llvm::APInt(32, i))});
+		builder.CreateCall(decl->func("vm_next_OP"), {bcontext.func_L, bcontext.func_cl, llvm::ConstantInt::get(context, llvm::APInt(32, i))});
 	}
 }
 
 
 void LLVMCompiler::compile(lua_State *L, Proto *p)
 {
+  //return;
+
 	BuildContext bcontext;
 
 	bcontext.code = p->code;
@@ -700,6 +703,7 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 	llvm::LLVMContext& context = *ts_context.getContext();
   auto func_name = GenerateFunctionName(p);
 	auto module = std::make_unique<llvm::Module>(func_name, context);
+	auto decl = vm_module.PrepareForwardDeclarations(module.get());
 
   llvm::Function* func = llvm::Function::Create(vm_module.t_lua_func, llvm::Function::ExternalLinkage, func_name, module.get());
 	// name arg1 = "L"
@@ -711,8 +715,10 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 	builder.SetInsertPoint(entry_block);
 
 	// get LClosure & constants.
-	bcontext.func_cl = builder.CreateCall(vm_module.func("vm_get_current_closure"), bcontext.func_L);
-	bcontext.func_k = builder.CreateCall(vm_module.func("vm_get_current_constants"), bcontext.func_cl);
+//  auto a = vm_module.func("vm_get_current_closure");
+	auto a = decl->func("vm_get_current_closure");
+	bcontext.func_cl = builder.CreateCall(a, bcontext.func_L);
+	bcontext.func_k = builder.CreateCall(decl->func("vm_get_current_constants"), bcontext.func_cl);
 
 	inlineList.push_back(bcontext.func_cl);
 	inlineList.push_back(bcontext.func_k);
@@ -768,7 +774,7 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 			}
 			if(op_count >= 3) {
 				// large block of mini ops add function call to vm_mini_vm()
-        builder.CreateCall(vm_module.func("vm_mini_vm"), {
+        builder.CreateCall(decl->func("vm_mini_vm"), {
 						bcontext.func_L, bcontext.func_cl,
             llvm::ConstantInt::get(context, llvm::APInt(32,op_count)),
             llvm::ConstantInt::get(context, llvm::APInt(32,i - bcontext.strip_ops))
@@ -790,14 +796,14 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 			}
 		}
 
-		auto opfunc = vm_module.op_func(opcode, op_hints[i]);
+		auto opfunc = decl->op_func(opcode, op_hints[i]);
 
 		if (OpCodeStats)
 		{
 			opcode_stats[opcode]++;
 		}
 
-		InsertDebugCalls(context, builder, bcontext, i);
+		InsertDebugCalls(decl.get(), context, builder, bcontext, i);
 
 		if (op_hints[i] & HINT_SKIP_OP)
 		{
@@ -975,7 +981,7 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 				branch = BRANCH_COND; // do conditional branch
 				break;
 			case OP_FORLOOP: {
-				llvm::Function* set_func = vm_module.func("vm_set_number");
+				llvm::Function* set_func = decl->func("vm_set_number");
 				llvm::CallInst* call2;
 
 				inline_call = true;
@@ -992,7 +998,7 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 				{
 					llvm::BasicBlock *idx_block;
 					if(op_hints[i] & HINT_USE_LONG) {
-						set_func = vm_module.func("vm_set_long");
+						set_func = decl->func("vm_set_long");
 					}
 					// create extra BasicBlock
           char name_buf[128];
@@ -1011,7 +1017,7 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 				break;
 			}
 			case OP_FORPREP: {
-				llvm::Function* get_func = vm_module.func("vm_get_number");
+				llvm::Function* get_func = decl->func("vm_get_number");
 				llvm::Value *idx_var,*init;
 				llvm::CallInst *call2;
 
@@ -1023,7 +1029,7 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 				if(vals == NULL) break;
 				if(op_hints[branch] & HINT_USE_LONG)
 				{
-					get_func = vm_module.func("vm_get_long");
+					get_func = decl->func("vm_get_long");
 				}
 				// get non-constant init from Lua stack.
 				if (vals->get(0) == nullptr)
@@ -1123,6 +1129,7 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 	}
 
 	if (DumpFunctions) func->print(llvm::errs());
+
 	// only run function inliner & optimization passes on same functions.
 	if(OptLevel > 0 && !DontInlineOpcodes) {
 		llvm::InlineFunctionInfo IFI;

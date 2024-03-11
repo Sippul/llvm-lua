@@ -21,6 +21,8 @@ public:
   std::unordered_map<hint_t, std::unique_ptr<OPFunctionVariant>> variants;
 };
 
+class VMModuleForwardDecl;
+
 class VMModule
 {
 public:
@@ -43,22 +45,27 @@ public:
 
   llvm::orc::ThreadSafeModule Load(llvm::orc::ThreadSafeContext context);
 
-  llvm::Function* func(const char* name) { return functions[name]; }
-
-  OPFunctionVariant* op_func(int opcode, hint_t hint);
+  std::unique_ptr<VMModuleForwardDecl> PrepareForwardDeclarations(llvm::Module* module);
 
 private:
-  std::unique_ptr<llvm::Module> vm_module;
+  void CollectVMTypes(llvm::LLVMContext& context);
+};
 
+class VMModuleForwardDecl
+{
+public:
+  llvm::Function* func(const char* name) { return functions[name]; }
+  OPFunctionVariant* op_func(int opcode, hint_t hint);
+
+  void PrepareVMFunctions(VMModule& vm, llvm::Module* module);
+  void PrepareVMOpcodes(VMModule& vm, llvm::LLVMContext& context, llvm::Module* module);
+
+private:
   std::unordered_map<const char*, llvm::Function*> functions;
   OPFunction op_functions[NUM_OPCODES];
 
-  void CollectVMTypes(llvm::LLVMContext& context);
-  void CollectVMFunctions(llvm::Module* module);
-  void CollectVMOpcodes(llvm::LLVMContext& context, llvm::Module* module);
-
-  void FindOrCreateFunction(llvm::Module* module, llvm::Type *result, llvm::ArrayRef<llvm::Type*> params, const char* name);
-  llvm::Type* GetVarType(llvm::LLVMContext& context, val_t type, hint_t hints);
+  void CreateFunctionDecl(llvm::Module* module, llvm::Type *result, llvm::ArrayRef<llvm::Type*> params, const char* name);
+  llvm::Type* GetVarType(VMModule& vm, llvm::LLVMContext& context, val_t type, hint_t hints);
 };
 
 

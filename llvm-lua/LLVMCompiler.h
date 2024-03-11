@@ -109,6 +109,7 @@ private:
 	std::vector<bool> need_op_block;
 
 	std::unordered_map<Proto*, llvm::orc::ResourceTrackerSP> trackers;
+	llvm::orc::ResourceTrackerSP vm_module_tracker;
 
 	// resize the opcode hint data arrays.
 	void ResizeOpcodeData(int code_len);
@@ -118,7 +119,7 @@ private:
 	void FindBasicBlockPoints(llvm::LLVMContext& context, llvm::IRBuilder<>& builder, BuildContext& bcontext);
 	void PreCreateBasicBlocks(llvm::LLVMContext& context, llvm::Function* func, BuildContext& bcontext);
 	std::vector<llvm::Value*> GetOpCallArgs(llvm::LLVMContext& context, const vm_func_info* func_info, BuildContext& bcontext, int i);
-	void InsertDebugCalls(llvm::LLVMContext& context, llvm::IRBuilder<>& builder, BuildContext& bcontext, int i);
+	void InsertDebugCalls(VMModuleForwardDecl* decl, llvm::LLVMContext& context, llvm::IRBuilder<>& builder, BuildContext& bcontext, int i);
 public:
 	explicit LLVMCompiler(int useJIT);
 	~LLVMCompiler();
