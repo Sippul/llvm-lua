@@ -68,7 +68,7 @@ void llvm_compiler_compile(lua_State *L, Proto *p) {
 	if(compiler == NULL) {
 		llvm_compiler_main(1);
 	}
-	compiler->compile(L, p);
+	compiler->Compile(L, p);
 }
 
 void llvm_compiler_compile_all(lua_State *L, Proto *p) {
@@ -76,13 +76,13 @@ void llvm_compiler_compile_all(lua_State *L, Proto *p) {
 	if(compiler == NULL) {
 		llvm_compiler_main(1);
 	}
-	compiler->compileAll(L, p);
+  compiler->CompileAll(L, p);
 }
 
 void llvm_compiler_free(lua_State *L, Proto *p) {
 	LLVMCompiler *compiler = llvm_get_compiler(L);
 	if(compiler != NULL) {
-		compiler->free(L, p);
+		compiler->Free(L, p);
 	}
 }
 

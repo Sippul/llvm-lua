@@ -20,7 +20,6 @@ extern "C" {
 /* state */
 #define JIT_PROTO_STATE \
 	lua_CFunction jit_func; /* jit compiled function */ \
-	void *func_ref; /* Reference to Function class */
 
 #include <lua.h>
 /* extern all lua core functions. */

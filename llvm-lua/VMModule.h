@@ -26,10 +26,20 @@ class VMModuleForwardDecl;
 class VMModule
 {
 public:
-  llvm::Type* t_init32;
-  llvm::Type* t_void;
+  struct ConstStruct
+  {
+    llvm::StructType* type = nullptr;
+    llvm::Constant* padding = nullptr;
+  };
+
+  llvm::Type* t_int8;
+  llvm::Type* t_int16;
+  llvm::Type* t_int32;
   llvm::Type* t_int64;
+  llvm::Type* t_void;
   llvm::Type* t_double;
+
+  llvm::Type* t_int32_ptr;
 
   llvm::Type* t_TValue;
   llvm::Type* t_LClosure;
@@ -40,6 +50,23 @@ public:
   llvm::Type* t_lua_State_ptr;
 
   llvm::FunctionType* t_lua_func;
+  llvm::Type*         t_lua_func_ptr;
+
+  llvm::Type* t_str_ptr;
+
+  llvm::StructType* t_constant_value;
+  llvm::StructType* t_constant_type;
+  llvm::Type*       t_constant_type_ptr;
+
+  std::unique_ptr<ConstStruct> t_constant_num;
+  std::unique_ptr<ConstStruct> t_constant_bool;
+  std::unique_ptr<ConstStruct> t_constant_str;
+
+  llvm::StructType* t_jit_LocVar;
+  llvm::Type* t_jit_LocVar_ptr;
+
+  llvm::StructType* t_jit_proto;
+  llvm::Type* t_jit_proto_ptr;
 
   VMModule();
 
@@ -48,7 +75,8 @@ public:
   std::unique_ptr<VMModuleForwardDecl> PrepareForwardDeclarations(llvm::Module* module);
 
 private:
-  void CollectVMTypes(llvm::LLVMContext& context);
+  void CollectVMTypes(llvm::LLVMContext& context, const llvm::DataLayout& data_layout);
+  std::unique_ptr<ConstStruct> CreateConstStruct(llvm::LLVMContext& context, unsigned pad_size, const char* name, llvm::Type* type);
 };
 
 class VMModuleForwardDecl

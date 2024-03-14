@@ -90,6 +90,7 @@ private:
 
 private:
   VMModule vm_module;
+	llvm::orc::ThreadSafeModule ts_vm_module;
   llvm::orc::ThreadSafeContext ts_context;
 	std::unique_ptr<llvm::orc::LLJIT> jit;
 
@@ -109,6 +110,9 @@ private:
 	std::vector<bool> need_op_block;
 
 	std::unordered_map<Proto*, llvm::orc::ResourceTrackerSP> trackers;
+	std::unordered_map<Proto*, std::unique_ptr<llvm::Module>> modules; // TODO make one module for parent proto
+	std::unordered_map<Proto*, std::string> proto_ir_map;
+
 	llvm::orc::ResourceTrackerSP vm_module_tracker;
 
 	// resize the opcode hint data arrays.
@@ -127,39 +131,25 @@ public:
 	/*
 	 * set code stripping mode.
 	 */
-	void setStripCode(bool strip) {
+	void SetStripCode(bool strip) {
 		strip_code = strip;
 	}
 
-	/*
-	 * return the module.
-	 */
-//	llvm::Module* getModule() {
-//		return ModuleRaw;
-//	}
-//
-//	llvm::LLVMContext& getCtx() {
-//		return Context;
-//	}
-//
-//	llvm::FunctionType *get_lua_func_type() {
-//		return lua_func_type;
-//	}
+	VMModule& GetVMModule() { return vm_module; }
+	std::unique_ptr<llvm::Module> LinkAllModulesIntoOne();
 
-	llvm::Type *get_var_type(val_t type, hint_t hints);
 
-	llvm::Value *get_proto_constant(TValue *constant);
 
+	llvm::Value *GetProtoConstant(TValue *constant);
   std::string GenerateFunctionName(Proto *p);
+	const std::string& GetFunctionName(Proto *p) { return proto_ir_map[p]; }
 	
 	/*
 	 * Pre-Compile all loaded functions.
 	 */
-	void compileAll(lua_State *L, Proto *parent);
-
-	void compile(lua_State *L, Proto *p);
-
-	void free(lua_State *L, Proto *p);
+	void CompileAll(lua_State *L, Proto *parent);
+	void Compile(lua_State *L, Proto *p);
+	void Free(lua_State *L, Proto *p);
 };
 
 #endif

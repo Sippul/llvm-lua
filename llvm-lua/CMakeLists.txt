@@ -12,7 +12,6 @@ set(LLVM_COMMON_SRC
 	VMModule.cpp
 	llvm_compiler.cpp
 	load_embedded_bc.cpp
-	load_vm_ops.cpp
 	lua_vm_ops_bc.h
 	${NON_LLVM_SRC}
 )
@@ -33,7 +32,6 @@ set(LLVM_LUAC_SRC
 	lua_compiler.c
 	LLVMDumper.cpp
 	llvm_dumper.cpp
-	load_liblua_main.cpp
 	liblua_main_bc.h
 )
 set(LLVM_LUA_LIB_SRC

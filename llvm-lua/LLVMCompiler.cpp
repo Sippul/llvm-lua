@@ -22,24 +22,21 @@
   MIT License: http://www.opensource.org/licenses/mit-license.php
 */
 
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/DerivedTypes.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h" 
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/Utils.h"
+#include "llvm/Target/TargetOptions.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Linker/Linker.h"
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -58,12 +55,10 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-#include "load_vm_ops.h"
 
 /*
  * Using lazing compilation requires large 512K c-stacks for each coroutine.
  */
-static bool NoLazyCompilation = true;
 static unsigned int OptLevel = 3;
 
 static llvm::cl::opt<bool> Fast("fast",
@@ -134,9 +129,11 @@ llvm::ExitOnError ExitOnErr;
 // Lua bytecode to LLVM IR compiler
 //===----------------------------------------------------------------------===//
 
-llvm::Value *LLVMCompiler::get_proto_constant(TValue *constant) {
-	llvm::Value *val = NULL;
-	switch(ttype(constant)) {
+llvm::Value* LLVMCompiler::GetProtoConstant(TValue *constant)
+{
+	llvm::Value* val = nullptr;
+	switch(ttype(constant))
+	{
 	case LUA_TBOOLEAN:
 		val = llvm::ConstantInt::get(*ts_context.getContext(), llvm::APInt(sizeof(LUA_NUMBER), !l_isfalse(constant)));
 		break;
@@ -149,6 +146,7 @@ llvm::Value *LLVMCompiler::get_proto_constant(TValue *constant) {
 	default:
 		break;
 	}
+
 	return val;
 }
 
@@ -172,6 +170,7 @@ LLVMCompiler::LLVMCompiler(int useJIT) :
 	// create timers.
 	lua_to_llvm = new llvm::Timer("lua_to_llvm", "Lua to LLVM");
 	codegen = new llvm::Timer("codegen", "Codegen");
+
 	strip_code = false;
 
 	if(llvm::TimePassesIsEnabled) load_ops.startTimer();
@@ -183,13 +182,6 @@ LLVMCompiler::LLVMCompiler(int useJIT) :
 		}
 	}
 
-	if(!useJIT) {
-		// running as static compiler, so don't use Lazy loading.
-		NoLazyCompilation = true;
-	}
-
-	auto ts_vm_module = vm_module.Load(ts_context);
-
 	if (RunOpCodeStats)
 	{
 		for (int i = 0; i < NUM_OPCODES; i++)
@@ -200,6 +192,8 @@ LLVMCompiler::LLVMCompiler(int useJIT) :
 
 	if (llvm::TimePassesIsEnabled) load_ops.stopTimer();
 	if (llvm::TimePassesIsEnabled) load_jit.startTimer();
+
+	ts_vm_module = vm_module.Load(ts_context);
 
 	// Create the JIT.
 	if (useJIT)
@@ -279,13 +273,13 @@ void LLVMCompiler::ClearOpcodeData(int code_len) {
 /*
  * Pre-Compile all loaded functions.
  */
-void LLVMCompiler::compileAll(lua_State *L, Proto *parent) {
+void LLVMCompiler::CompileAll(lua_State *L, Proto *parent) {
 	int i;
 	/* pre-compile parent */
-	compile(L, parent);
+	Compile(L, parent);
 	/* pre-compile all children */
 	for(i = 0; i < parent->sizep; i++) {
-		compileAll(L, parent->p[i]);
+		CompileAll(L, parent->p[i]);
 	}
 }
 
@@ -565,10 +559,10 @@ std::vector<llvm::Value*> LLVMCompiler::GetOpCallArgs(llvm::LLVMContext& context
 				val = llvm::ConstantInt::get(context, llvm::APInt(32,luaO_fb2int(GETARG_C(op_intr))));
 				break;
 			case VAR_T_ARG_Bx_NUM_CONSTANT:
-				val = get_proto_constant(bcontext.k + INDEXK(GETARG_Bx(op_intr)));
+				val = GetProtoConstant(bcontext.k + INDEXK(GETARG_Bx(op_intr)));
 				break;
 			case VAR_T_ARG_C_NUM_CONSTANT:
-				val = get_proto_constant(bcontext.k + INDEXK(GETARG_C(op_intr)));
+				val = GetProtoConstant(bcontext.k + INDEXK(GETARG_C(op_intr)));
 				break;
 			case VAR_T_ARG_C_NEXT_INSTRUCTION: {
 				int c = GETARG_C(op_intr);
@@ -668,7 +662,7 @@ void LLVMCompiler::InsertDebugCalls(VMModuleForwardDecl* decl, llvm::LLVMContext
 }
 
 
-void LLVMCompiler::compile(lua_State *L, Proto *p)
+void LLVMCompiler::Compile(lua_State *L, Proto *p)
 {
   //return;
 
@@ -1157,17 +1151,42 @@ void LLVMCompiler::compile(lua_State *L, Proto *p)
 		p->jit_func = nullptr;
 	}
 
-	p->func_ref = func;
+	modules[p] = std::move(module);
+	proto_ir_map[p] = func_name;
 
 	if(llvm::TimePassesIsEnabled) codegen->stopTimer();
 }
 
-void LLVMCompiler::free(lua_State *L, Proto *p)
+void LLVMCompiler::Free(lua_State *L, Proto *p)
 {
 	if (trackers.contains(p))
 	{
 		ExitOnErr(trackers[p]->remove());
 		trackers.erase(p);
 	}
+}
+
+std::unique_ptr<llvm::Module> LLVMCompiler::LinkAllModulesIntoOne()
+{
+	assert(jit == nullptr);
+
+	std::unique_ptr<llvm::Module> final_module = ts_vm_module.consumingModuleDo([](std::unique_ptr<llvm::Module> module) {
+		return std::move(module);
+	});
+
+	auto data_layout = final_module->getDataLayout();
+
+	for (auto& [key, module]: modules)
+	{
+		module->setDataLayout(data_layout);
+		if (llvm::Linker::linkModules(*final_module, std::move(module)))
+		{
+			// TODO: print correct error
+			fprintf(stderr, "Failed to link compiled Lua scripts together': %s", "unknown");
+			exit(1);
+		}
+	}
+
+	return final_module;
 }
 

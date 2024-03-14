@@ -51,53 +51,27 @@ class LLVMCompiler;
 
 class LLVMDumper {
 private:
-	LLVMCompiler *compiler;
-	llvm::Module *Module;
 
-	// types.
-	llvm::Type *Ty_str_ptr;
-	llvm::StructType *Ty_constant_value;
-	llvm::StructType *Ty_constant_type;
-	llvm::Type *Ty_constant_type_ptr;
-	llvm::StructType *Ty_constant_num_type;
-	llvm::Constant *num_padding;
-	llvm::StructType *Ty_constant_bool_type;
-	llvm::Constant *bool_padding;
-	llvm::StructType *Ty_constant_str_type;
-	llvm::Constant *str_padding;
-	llvm::StructType *Ty_jit_LocVar;
-	llvm::Type *Ty_jit_LocVar_ptr;
-	llvm::StructType *Ty_jit_proto;
-	llvm::Type *Ty_jit_proto_ptr;
-	llvm::FunctionType *lua_func_type;
-	llvm::Type *lua_func_type_ptr;
+	LLVMCompiler *compiler;
 
 public:
-	LLVMDumper(LLVMCompiler *compiler);
+	explicit LLVMDumper(LLVMCompiler *compiler);
 
 	void dump(const char *output, lua_State *L, Proto *p, int stripping);
 
-	llvm::LLVMContext& getCtx() const {
-		return compiler->getCtx();
-	}
-
 private:
-	llvm::Constant *get_ptr(llvm::Constant *val);
+	llvm::Constant* GetConstPtr(llvm::LLVMContext& context, llvm::Constant *val);
+	llvm::Constant* GetGlobalStr(llvm::LLVMContext& context, llvm::Module* module, const char *str);
 
-	llvm::Constant *get_global_str(const char *str);
+	llvm::GlobalVariable* BuildConstants(llvm::LLVMContext& context, llvm::Module* module, VMModule& vm, Proto *p);
+	llvm::GlobalVariable *BuildLocVars(llvm::LLVMContext& context, llvm::Module* module, VMModule& vm, Proto *p);
+	llvm::GlobalVariable *BuildUpValues(llvm::LLVMContext& context, llvm::Module* module, Proto *p);
+	llvm::Constant* BuildProtoGLobalVar(llvm::LLVMContext& context, llvm::Module* module, VMModule& vm, Proto *p);
 
-	llvm::GlobalVariable *dump_constants(Proto *p);
+	void BuildStandalone(llvm::LLVMContext& context, llvm::Module* module, VMModule& vm, Proto *p);
+	void BuildLuaModule(llvm::LLVMContext& context, llvm::Module* module, VMModule& vm, Proto *p, std::string mod_name);
 
-	llvm::GlobalVariable *dump_locvars(Proto *p);
-
-	llvm::GlobalVariable *dump_upvalues(Proto *p);
-
-	llvm::Constant *dump_proto(Proto *p);
-
-	void dump_standalone(Proto *p);
-
-	void dump_lua_module(Proto *p, std::string mod_name);
-
+	std::string NormalizeModuleName(std::string mod_name);
 };
 #endif
 

@@ -1,4 +1,3 @@
-
 bar = function(x)
     return "My test: " .. x
 end

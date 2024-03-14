@@ -77,7 +77,6 @@ void llvm_freeproto (lua_State *L, Proto *f);
 void llvm_newproto (lua_State *L, Proto *f) {
 	(void)L;
 	f->jit_func = NULL;
-	f->func_ref = NULL;
 }
 
 void llvm_freeproto (lua_State *L, Proto *f) {
